@@ -34,7 +34,8 @@ public class ChatService {
     public Page<ChatResponse> getChats(String appContext, Boolean archived, Pageable pageable) {
         Long currentUserId = chatAuthorizationHelper.getCurrentUserId();
 
-        Page<Chat> chats = chatRepository.findAllByAppContextAndUser(appContext, currentUserId, archived, pageable);
+        Page<Chat> chats = chatRepository
+                .findAllByAppContextAndUser(appContext, currentUserId, archived, pageable);
 
         return chats.map(chatResponseMapper);
     }
@@ -57,7 +58,7 @@ public class ChatService {
                 .findBetweenUsersAndAppContext(currentUserId, request.participantUserId(), request.appContext().toString());
 
         if (chat != null) {
-            return restoreDeletedChat(chat);
+            return restoreDeletedChat(chat, currentUserId);
         }
 
         Chat newChat = Chat.builder()
@@ -69,9 +70,7 @@ public class ChatService {
         return chatDetailsResponseMapper.apply(chatRepository.save(newChat));
     }
 
-    private ChatDetailsResponse restoreDeletedChat(Chat chat) {
-        Long currentUserId = chatAuthorizationHelper.getCurrentUserId();
-
+    private ChatDetailsResponse restoreDeletedChat(Chat chat, Long currentUserId) {
         boolean isCreator = chat.isCreator(currentUserId);
         boolean isParticipant = chat.isParticipant(currentUserId);
 
@@ -82,8 +81,14 @@ public class ChatService {
         if (isCreator && chat.isDeletedByCreator()) {
             chat.setDeletedByCreator(false);
         }
+        else if (isCreator) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
+        }
         if (isParticipant && chat.isDeletedByParticipant()) {
             chat.setDeletedByParticipant(false);
+        }
+        else if (isParticipant) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
         }
 
         return chatDetailsResponseMapper.apply(chatRepository.save(chat));
@@ -103,13 +108,11 @@ public class ChatService {
         boolean updated = false;
 
         if (isCreator && !chat.isDeletedByCreator()) {
-            applyUpdates(chat, request, true);
-            updated = true;
+            updated = applyUpdates(chat, request, true);
         }
 
         if (isParticipant && !chat.isDeletedByParticipant()) {
-            applyUpdates(chat, request, false);
-            updated = true;
+            updated = applyUpdates(chat, request, false);
         }
 
         if (!updated) {
@@ -120,7 +123,8 @@ public class ChatService {
         return chatDetailsResponseMapper.apply(savedChat);
     }
 
-    private void applyUpdates(Chat chat, UpdateChatRequest request, boolean isCreator) {
+    private boolean applyUpdates(Chat chat, UpdateChatRequest request, boolean isCreator) {
+        boolean updated = false;
         if (request.isArchived() != null) {
             if (isCreator) {
                 chat.setArchivedByCreator(request.isArchived());
@@ -128,6 +132,7 @@ public class ChatService {
             else {
                 chat.setArchivedByParticipant(request.isArchived());
             }
+            updated = true;
         }
         if (request.isMuted() != null) {
             if (isCreator) {
@@ -136,6 +141,7 @@ public class ChatService {
             else {
                 chat.setMutedByParticipant(request.isMuted());
             }
+            updated = true;
         }
         if (request.isRead() != null) {
             if (isCreator) {
@@ -144,7 +150,9 @@ public class ChatService {
             else {
                 chat.setLastReadByParticipant(LocalDateTime.now());
             }
+            updated = true;
         }
+        return updated;
     }
 
     @Transactional
