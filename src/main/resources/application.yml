@@ -1,7 +1,7 @@
-server:
-  port: 8080
 spring:
   application:
     name: ChatApi
   profiles:
     active: dev
+server:
+  port: 8082

@@ -11,11 +11,6 @@ spring:
     test:
       database:
         replace: any
-cors:
-  allowed-origins:
-    - http://localhost:4200
-jwt:
-  secret: 23e586808ea364607079ec5b830ba702e80680339864b175eb2f5a13abd214e7
 logging:
   level:
     org:

@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://chatdb:5432/chatdb
+    url: jdbc:postgresql://postgresql_chat_api:5432/chatdb
     username: IgnacioVillarreal
     password: 12345678
   jpa:
